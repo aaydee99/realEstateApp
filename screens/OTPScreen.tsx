@@ -1,13 +1,17 @@
 // File: /screens/OTPScreen.tsx
 
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native'; // Import useNavigation and useRoute hooks
+import { verifyOtp } from '../api/userApi'; // Import verifyOtp function
 
 const OTPScreen: React.FC = () => {
   const [otp, setOtp] = useState(['', '', '', '']);
+  const [loading, setLoading] = useState(false);
   const inputsRef = useRef<(TextInput | null)[]>([]);
   const navigation = useNavigation(); // Initialize navigation hook
+  const route = useRoute(); // Get the route to retrieve parameters
+  const { phone } = route.params as { phone: string }; // Retrieve the phone number passed from the previous screen
 
   const handleChange = (value: string, index: number) => {
     const newOtp = [...otp];
@@ -21,11 +25,26 @@ const OTPScreen: React.FC = () => {
 
     // Check if all inputs are filled to navigate
     if (newOtp.every((item) => item !== '')) {
-      // Ensure OTP is complete before navigating
-      setTimeout(() => {
-        navigation.navigate('Main'); // Navigate to the main screen
-      }, 500); // Add a delay to ensure input handling completes
+      // Ensure OTP is complete before verifying
+      verifyOtpCode(newOtp.join('')); // Convert array to string
     }
+  };
+
+  const verifyOtpCode = async (otpCode: string) => {
+    setLoading(true); // Set loading to true
+    try {
+      const response = await verifyOtp(phone, otpCode); // Call verifyOtp API
+      setLoading(false); // Reset loading state
+      Alert.alert('Success', 'OTP verified successfully.');
+      navigation.navigate('Main'); // Navigate to the main screen
+    } catch (error) {
+      setLoading(false); // Reset loading state
+      Alert.alert('Error', error as string);
+    }
+  };
+
+  const handleResendCode = async () => {
+    // Implement resend OTP functionality here if needed
   };
 
   return (
@@ -52,7 +71,7 @@ const OTPScreen: React.FC = () => {
       </View>
 
       {/* Resend Code Button */}
-      <TouchableOpacity>
+      <TouchableOpacity onPress={handleResendCode}>
         <Text style={styles.resendCode}>Resend Code</Text>
       </TouchableOpacity>
     </View>

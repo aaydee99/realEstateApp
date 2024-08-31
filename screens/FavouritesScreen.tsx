@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import NotFound from '../assets/NotFound';
 
 const FavouritesScreen: React.FC = () => {
   const [isFavouriteTab, setIsFavouriteTab] = useState(true);
@@ -42,10 +43,7 @@ const FavouritesScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Image
-        source={{ uri: 'https://via.placeholder.com/300x200' }} // Replace with your own illustration URL
-        style={styles.emptyImage}
-      />
+      <NotFound/>
       <Text style={styles.emptyTitle}>
         {isFavouriteTab ? 'You have no favourites' : 'You have not contacted anyone'}
       </Text>

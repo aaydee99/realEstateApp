@@ -1,40 +1,49 @@
 // File: /screens/SingleChatScreen.tsx
 
-import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, TextInput } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, TextInput, Alert, ActivityIndicator } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { getMessagesForChat, sendMessage } from '../api/messageApi'; // Import API functions
 
 const SingleChatScreen: React.FC = () => {
-    const navigation = useNavigation();
-  // Sample data for chat messages
-  const messages = [
-    {
-      id: '1',
-      text: 'Both with sisters first very to remodelling logbook due and attempt. Dropped him is the come comment a candidates...',
-      time: '17:57',
-      sender: 'other',
-    },
-    {
-      id: '2',
-      text: 'Much to omens, accept would was basically.',
-      time: '18:49',
-      sender: 'me',
-    },
-    {
-      id: '3',
-      text: 'Are hazardous sight rolled subordinates what his average many, to the feel among scent cleaning and behavioural written 😊',
-      time: '18:49',
-      sender: 'me',
-    },
-    {
-      id: '4',
-      text: 'gilded the go so might that mail odd they after recently than be around times...',
-      time: '15:24',
-      sender: 'other',
-    },
-    // Add more messages as needed
-  ];
+  const navigation = useNavigation();
+  const route = useRoute(); // Get route to access parameters
+  const { chatId } = route.params as { chatId: string }; // Extract chatId from route params
+  const [messages, setMessages] = useState([]); // State for messages
+  const [loading, setLoading] = useState(true); // State for loading indicator
+  const [newMessage, setNewMessage] = useState(''); // State for new message input
+  const [sending, setSending] = useState(false); // State for sending message
+
+  useEffect(() => {
+    fetchMessages(); // Fetch messages when the component mounts
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const fetchedMessages = await getMessagesForChat(chatId);
+      setMessages(fetchedMessages);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', error as string);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return; // Do not send empty messages
+    setSending(true);
+    try {
+      const senderId = 'your-sender-id'; // Replace with actual sender ID
+      const sentMessage = await sendMessage(chatId, senderId, newMessage);
+      setMessages([...messages, sentMessage]); // Update messages list
+      setNewMessage(''); // Clear input field
+    } catch (error) {
+      Alert.alert('Error', error as string);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const renderMessageItem = ({ item }: { item: any }) => (
     <View style={[styles.messageBubble, item.sender === 'me' ? styles.myMessage : styles.otherMessage]}>
@@ -43,11 +52,19 @@ const SingleChatScreen: React.FC = () => {
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#00D6BE" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={()=>{navigation.navigate('Main')}}>
+        <TouchableOpacity onPress={() => { navigation.goBack(); }}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
         <Image
@@ -73,9 +90,11 @@ const SingleChatScreen: React.FC = () => {
           placeholder="Write a message"
           placeholderTextColor="#888"
           style={styles.input}
+          value={newMessage}
+          onChangeText={setNewMessage}
         />
-        <TouchableOpacity>
-          <MaterialCommunityIcons name="send" size={24} color="#00D6BE" style={styles.icon} />
+        <TouchableOpacity onPress={handleSendMessage} disabled={sending}>
+          <MaterialCommunityIcons name="send" size={24} color={sending ? '#888' : '#00D6BE'} style={styles.icon} />
         </TouchableOpacity>
       </View>
     </View>
@@ -151,6 +170,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     color: '#fff',
     marginHorizontal: 10,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0d0d0d',
   },
 });
 

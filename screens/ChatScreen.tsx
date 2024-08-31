@@ -1,78 +1,60 @@
 // File: /screens/ChatScreen.tsx
 
 import { useNavigation } from '@react-navigation/native';
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, FlatList, Alert, ActivityIndicator } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import { getUserMessages } from '../api/messageApi'; // Import getUserMessages function
 
 const ChatScreen: React.FC = () => {
   const navigation = useNavigation();
-  // Sample data for chat messages
-  const messages = [
-    {
-      id: '1',
-      name: 'Mahnoor Naseer',
-      message: 'Makes to a illustrated on all and...',
-      time: '17:33',
-      avatar: 'https://via.placeholder.com/100', // Replace with real image URLs
-      unread: 0,
-    },
-    {
-      id: '2',
-      name: 'Imran Khan',
-      message: 'Hey, I heard that you wanted...',
-      time: '16:42',
-      avatar: 'https://via.placeholder.com/100',
-      unread: 3,
-    },
-    {
-      id: '3',
-      name: 'Test Property',
-      message: 'For sure! Let’s hangout on Sund...',
-      time: '14:32',
-      avatar: 'https://via.placeholder.com/100',
-      unread: 0,
-    },
-    {
-      id: '4',
-      name: 'Aaron Zimmer',
-      message: 'No 😅 I just went to bed right...',
-      time: 'Yesterday',
-      avatar: 'https://via.placeholder.com/100',
-      unread: 0,
-    },
-    {
-      id: '5',
-      name: 'Annette Black',
-      message: 'Ooooh thank you so much! ❤️ 1',
-      time: 'Wednesday',
-      avatar: 'https://via.placeholder.com/100',
-      unread: 1,
-    },
-    // Add more messages as needed
-  ];
+  const [messages, setMessages] = useState([]); // State to hold messages
+  const [loading, setLoading] = useState(true); // Loading state
 
-  // Update the render function for each message item in ChatScreen.tsx
+  useEffect(() => {
+    fetchMessages(); // Fetch messages when the component mounts
+  }, []);
 
-const renderMessageItem = ({ item }: { item: any }) => (
-  <TouchableOpacity onPress={() => navigation.navigate('ChatDetail')}>
-    <View style={styles.messageContainer}>
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={styles.messageInfo}>
-        <Text style={styles.messageName}>{item.name}</Text>
-        <Text style={styles.messageText} numberOfLines={1}>{item.message}</Text>
+  const fetchMessages = async () => {
+    try {
+      // Replace 'user-id' with the actual user ID you want to fetch messages for
+      const userId = 'user-id';
+      const fetchedMessages = await getUserMessages(userId);
+      setMessages(fetchedMessages);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', error as string);
+    }
+  };
+
+  const renderMessageItem = ({ item }: { item: any }) => (
+    <TouchableOpacity onPress={() => navigation.navigate('ChatDetail', { chatId: item.id })}>
+      <View style={styles.messageContainer}>
+        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        <View style={styles.messageInfo}>
+          <Text style={styles.messageName}>{item.name}</Text>
+          <Text style={styles.messageText} numberOfLines={1}>{item.message}</Text>
+        </View>
+        <View style={styles.messageMeta}>
+          <Text style={styles.messageTime}>{item.time}</Text>
+          {item.unread > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unread}</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <View style={styles.messageMeta}>
-        <Text style={styles.messageTime}>{item.time}</Text>
-        {item.unread > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{item.unread}</Text>
-          </View>
-        )}
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#00D6BE" />
       </View>
-    </View>
-  </TouchableOpacity>
-);
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -162,6 +144,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0d0d0d',
   },
 });
 
