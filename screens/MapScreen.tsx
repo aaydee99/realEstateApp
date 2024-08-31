@@ -1,133 +1,111 @@
 // File: /screens/MapScreen.tsx
 
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
-import MapView, { Marker, Polygon } from 'react-native-maps';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import HamburgerIcon from '../assets/HamburgerIcon';
-import BriefcaseIcon from '../assets/BriefCaseIcon';
-import Modal from 'react-native-modal';
-import moment from 'moment';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { getProperties, addProperty, Property } from '../api/propertyApi'; // Import API functions
 
 const MapScreen: React.FC = () => {
-  const [dropdownVisible, setDropdownVisible] = useState(false);
-  const [selectedButton, setSelectedButton] = useState<string>('Daily/Monthly');
-  const [boundaryCoordinates, setBoundaryCoordinates] = useState([
-    { latitude: 37.79025, longitude: -122.4314 },
-    { latitude: 37.78825, longitude: -122.4324 },
-    { latitude: 37.78725, longitude: -122.4334 },
-    { latitude: 37.78525, longitude: -122.4344 },
-    { latitude: 37.78425, longitude: -122.4354 },
-    { latitude: 37.78625, longitude: -122.4374 },
-  ]);
+  const [properties, setProperties] = useState<Property[]>([]); // State for properties
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false); // State to control the modal visibility
+  const [propertyName, setPropertyName] = useState('');
+  const [description, setDescription] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null); // Change to number to handle null
+  const [longitude, setLongitude] = useState<number | null>(null); // Change to number to handle null
+  const [price, setPrice] = useState('');
+  const mapRef = useRef<MapView>(null);
 
-  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  useEffect(() => {
+    fetchProperties(); // Fetch properties when the component mounts
+  }, []);
 
-  const searchHistory = [
-    "Apartment for Booking",
-    "Villa for Booking",
-    "Studio for Booking",
-    "Chalet for Booking",
-    "Lounge for Booking",
-    "Tent for Booking",
-    "Farm for Booking",
-    "Hall for Booking",
-  ];
-
-  const handleButtonPress = (button: string) => {
-    setSelectedButton(button);
+  const fetchProperties = async () => {
+    try {
+      const fetchedProperties = await getProperties();
+      setProperties(fetchedProperties);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+      Alert.alert('Error', error as string);
+    }
   };
 
-  const toggleDatePicker = () => {
-    setDatePickerVisible(!isDatePickerVisible);
-  };
-
-  const handleDateSelect = (date: Date) => {
-    setSelectedDates((prevDates) =>
-      prevDates.includes(date) ? prevDates.filter((d) => d !== date) : [...prevDates, date]
-    );
-  };
-
-  const renderCalendar = () => {
-    const startOfMonth = moment().startOf('month');
-    const daysInMonth = moment().daysInMonth();
-    const weeks = [];
-    let days = [];
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(
-        <TouchableOpacity
-          key={i}
-          style={[
-            styles.calendarDay,
-            selectedDates.includes(i) && styles.selectedDay,
-          ]}
-          onPress={() => handleDateSelect(i)}
-        >
-          <Text style={styles.calendarDayText}>{i}</Text>
-        </TouchableOpacity>
-      );
-
-      if (i % 7 === 0 || i === daysInMonth) {
-        weeks.push(
-          <View key={i} style={styles.calendarWeek}>
-            {days}
-          </View>
-        );
-        days = [];
-      }
+  const handleAddProperty = async () => {
+    if (!propertyName || latitude === null || longitude === null || !price) {
+      Alert.alert('Error', 'Please fill out all fields.');
+      return;
     }
 
-    return weeks;
+    setLoading(true);
+    try {
+      const newProperty: Property = {
+        name: propertyName,
+        description,
+        latitude,
+        longitude,
+        price: parseFloat(price),
+      };
+      await addProperty(newProperty);
+      Alert.alert('Success', 'Property added successfully.');
+      setModalVisible(false); // Close the modal after adding property
+      fetchProperties(); // Refresh properties on the map
+    } catch (error) {
+      Alert.alert('Error', error as string);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onMapPress = (e: any) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setLatitude(latitude);
+    setLongitude(longitude);
+    setModalVisible(true); // Open the modal with the selected location
   };
 
   return (
     <View style={styles.container}>
-      {/* Search and Filter Bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search..."
-          placeholderTextColor="#888"
-          onFocus={() => setDropdownVisible(true)}
-          onBlur={() => setDropdownVisible(false)}
-        />
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterButtonText}>All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterButtonText}>Apartment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.filterButton}>
-          <Text style={styles.filterButtonText}>Villa</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Dropdown for Search History */}
-      {dropdownVisible && (
-        <View style={styles.dropdownContainer}>
-          <FlatList
-            data={searchHistory}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.historyItem} onPress={() => setDropdownVisible(false)}>
-                <Text style={styles.historyText}>{item}</Text>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#676D75" />
-              </TouchableOpacity>
-            )}
-            keyExtractor={(item, index) => index.toString()}
-          />
-        </View>
-      )}
-
-      {/* Information Text */}
-      <View style={styles.infoContainer}>
-        <MaterialCommunityIcons name="information-outline" size={20} color="#fff" />
-        <Text style={styles.infoText}>59 of 285 shown. Zoom in to see more.</Text>
-      </View>
+      {/* Location Search Bar */}
+      <GooglePlacesAutocomplete
+        placeholder="Search"
+        fetchDetails={true}
+        onPress={(data, details = null) => {
+          const lat = details?.geometry.location.lat;
+          const lng = details?.geometry.location.lng;
+          if (lat && lng) {
+            setLatitude(lat);
+            setLongitude(lng);
+            mapRef.current?.animateToRegion({
+              latitude: lat,
+              longitude: lng,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }, 1000);
+            setModalVisible(true); // Open the modal when a location is selected
+          }
+        }}
+        query={{
+          key: 'YOUR_GOOGLE_API_KEY', // Replace with your Google Maps API Key
+          language: 'en',
+        }}
+        styles={{
+          container: {
+            position: 'absolute',
+            top: 10,
+            width: '100%',
+            zIndex: 1,
+          },
+          listView: {
+            backgroundColor: 'white',
+          },
+        }}
+      />
 
       {/* Google Map */}
       <MapView
+        ref={mapRef}
         style={styles.map}
         initialRegion={{
           latitude: 37.78825,
@@ -135,86 +113,85 @@ const MapScreen: React.FC = () => {
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
         }}
+        onPress={onMapPress} // Get coordinates when pressing the map
       >
-        {/* Draw Boundary */}
-        {boundaryCoordinates.length > 0 && (
-          <Polygon
-            coordinates={boundaryCoordinates}
-            strokeColor="#00D6BE"
-            fillColor="rgba(0, 214, 190, 0.2)"
-            strokeWidth={2}
-          />
-        )}
-
-        {/* Custom Markers */}
-        <Marker coordinate={{ latitude: 37.78825, longitude: -122.4324 }} onPress={toggleDatePicker}>
-          <View style={styles.marker}>
-            <Text style={styles.markerText}>90K</Text>
-          </View>
-        </Marker>
-        <Marker coordinate={{ latitude: 37.78925, longitude: -122.4314 }} onPress={toggleDatePicker}>
-          <View style={styles.marker}>
-            <Text style={styles.markerText}>40K</Text>
-          </View>
-        </Marker>
-        <Marker coordinate={{ latitude: 37.78725, longitude: -122.4334 }} onPress={toggleDatePicker}>
-          <View style={styles.marker}>
-            <Text style={styles.markerText}>160K</Text>
-          </View>
-        </Marker>
+        {properties.map((property) => (
+          <Marker
+            key={property.id}
+            coordinate={{ latitude: property.latitude, longitude: property.longitude }}
+          >
+            <View style={styles.marker}>
+              <Text style={styles.markerText}>{property.price}K</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
-      {/* Floating List Button */}
-      <TouchableOpacity style={styles.listButton}>
-        <Text style={styles.listButtonText}>List View</Text>
-        <HamburgerIcon width={15} height={15} fill="#fff" />
+      {/* Floating Add Property Button */}
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setModalVisible(true)}
+      >
+        <Text style={styles.addButtonText}>Add Property</Text>
       </TouchableOpacity>
 
-      {/* Bottom Buttons Above Tab Navigator */}
-      <View style={styles.bottomButtons}>
-        {['Daily/Monthly', 'For Rent', 'For Sale'].map((buttonLabel) => (
-          <TouchableOpacity
-            key={buttonLabel}
-            style={[
-              styles.bottomButton,
-              selectedButton === buttonLabel ? styles.bottomButtonSelected : styles.bottomButtonUnselected,
-            ]}
-            onPress={() => handleButtonPress(buttonLabel)}
-          >
-            <Text
-              style={[
-                styles.bottomButtonText,
-                selectedButton === buttonLabel ? styles.bottomButtonTextSelected : styles.bottomButtonTextUnselected,
-              ]}
-            >
-              {buttonLabel}
-            </Text>
-            <BriefcaseIcon
-              width={15}
-              height={15}
-              fill={selectedButton === buttonLabel ? '#00D6BE' : '#fff'}
+      {/* Add Property Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => {
+          setModalVisible(!modalVisible);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Add New Property</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Property Name"
+              value={propertyName}
+              onChangeText={setPropertyName}
             />
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Date Picker Modal */}
-      <Modal isVisible={isDatePickerVisible} onBackdropPress={toggleDatePicker}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Pick Reservation Date</Text>
-            <TouchableOpacity onPress={toggleDatePicker}>
-              <MaterialCommunityIcons name="close" size={24} color="#00D6BE" />
+            <TextInput
+              style={styles.input}
+              placeholder="Description"
+              value={description}
+              onChangeText={setDescription}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Latitude"
+              value={latitude ? latitude.toString() : ''}
+              onChangeText={(text) => setLatitude(parseFloat(text))}
+              keyboardType="numeric"
+              editable={false} // Make latitude and longitude non-editable
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Longitude"
+              value={longitude ? longitude.toString() : ''}
+              onChangeText={(text) => setLongitude(parseFloat(text))}
+              keyboardType="numeric"
+              editable={false} // Make latitude and longitude non-editable
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Price"
+              value={price}
+              onChangeText={setPrice}
+              keyboardType="numeric"
+            />
+            <TouchableOpacity style={styles.modalButton} onPress={handleAddProperty} disabled={loading}>
+              <Text style={styles.modalButtonText}>{loading ? 'Adding...' : 'Add Property'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.modalMonth}>June</Text>
-          <TouchableOpacity>
-            <Text style={styles.modalWholeMonth}>Whole month</Text>
-          </TouchableOpacity>
-          <View style={styles.calendarContainer}>{renderCalendar()}</View>
-          <TouchableOpacity style={styles.confirmButton} onPress={toggleDatePicker}>
-            <Text style={styles.confirmButtonText}>Confirm</Text>
-          </TouchableOpacity>
         </View>
       </Modal>
     </View>
@@ -254,43 +231,6 @@ const styles = StyleSheet.create({
   filterButtonText: {
     color: '#fff',
   },
-  dropdownContainer: {
-    position: 'absolute',
-    top: 100,
-    left: 10,
-    right: 10,
-    backgroundColor: '#1f1f1f',
-    borderRadius: 10,
-    padding: 10,
-    zIndex: 2,
-  },
-  historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#676D75',
-  },
-  historyText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  infoContainer: {
-    position: 'absolute',
-    top: 120,
-    left: '10%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6c5ce7',
-    borderRadius: 15,
-    padding: 10,
-    zIndex: 1,
-  },
-  infoText: {
-    marginLeft: 5,
-    color: '#fff',
-  },
   map: {
     flex: 1,
   },
@@ -303,116 +243,59 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  listButton: {
+  addButton: {
     position: 'absolute',
-    bottom: 130,
-    left: 10,
+    bottom: 40,
+    right: 20,
     backgroundColor: '#00D6BE',
-    color: '#fff',
-    borderRadius: 12,
+    borderRadius: 20,
+    paddingVertical: 10,
     paddingHorizontal: 15,
-    width: 100,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
-    alignContent: 'center',
-    gap: 10,
   },
-  listButtonText: {
+  addButtonText: {
     color: '#fff',
     fontWeight: 'bold',
   },
-  bottomButtons: {
-    position: 'absolute',
-    bottom: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingHorizontal: 10,
-  },
-  bottomButton: {
-    flexDirection: 'row',
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginHorizontal: 5,
-  },
-  bottomButtonSelected: {
-    backgroundColor: '#fff',
-  },
-  bottomButtonUnselected: {
-    backgroundColor: '#00D6BE',
-  },
-  bottomButtonText: {
-    marginRight: 5,
-  },
-  bottomButtonTextSelected: {
-    color: '#00D6BE',
-  },
-  bottomButtonTextUnselected: {
-    color: '#fff',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContainer: {
-    backgroundColor: '#1f1f1f',
+    width: '90%',
+    backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 20,
   },
-  modalMonth: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginVertical: 10,
-  },
-  modalWholeMonth: {
-    color: '#00D6BE',
-    alignSelf: 'flex-end',
-    marginBottom: 10,
-  },
-  calendarContainer: {
-    flexDirection: 'column',
-  },
-  calendarWeek: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  calendarDay: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 2,
+  input: {
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 10,
+    marginBottom: 15,
     borderRadius: 5,
   },
-  selectedDay: {
+  modalButton: {
     backgroundColor: '#00D6BE',
-  },
-  calendarDayText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  confirmButton: {
-    backgroundColor: '#00D6BE',
-    borderRadius: 10,
-    paddingVertical: 10,
+    padding: 10,
+    borderRadius: 5,
+    width: '100%',
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 10,
   },
-  confirmButtonText: {
+  modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 18,
+  },
+  cancelButton: {
+    backgroundColor: '#f44336',
   },
 });
 
